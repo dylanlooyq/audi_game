@@ -348,11 +348,12 @@ class AuditionGame {
     const bar = document.querySelector('.beat-bar');
     if (!fill || !bar) return;
     const t = this.now();
-    if (t < seq.startTime) { fill.style.width = '0%'; bar.classList.remove('armed'); return; }
+    if (t < seq.startTime) { fill.style.width = '0%'; bar.classList.remove('armed', 'perfect-armed'); return; }
     const progress = Math.min(1, (t - seq.startTime) / (seq.commitTime - seq.startTime));
     fill.style.width = `${progress * 100}%`;
-    const nearTarget = Math.abs(t - seq.commitTime) <= TIMING.bad;
-    bar.classList.toggle('armed', nearTarget || progress >= 1);
+    const diff = Math.abs(t - seq.commitTime);
+    bar.classList.toggle('armed', diff <= TIMING.bad || progress >= 1);
+    bar.classList.toggle('perfect-armed', diff <= TIMING.perfect);
   }
 
   renderRest() {
@@ -421,14 +422,9 @@ class AuditionGame {
   }
 
   updateHud() {
-    const comboEl = document.querySelector('#combo');
     const scoreEl = document.querySelector('#score');
-    if (!comboEl || !scoreEl) return;
-    comboEl.textContent = this.score.combo;
+    if (!scoreEl) return;
     scoreEl.textContent = this.score.score.toLocaleString();
-    comboEl.classList.remove('pop');
-    void comboEl.offsetWidth;
-    comboEl.classList.add('pop');
     scoreEl.classList.remove('pop');
     void scoreEl.offsetWidth;
     scoreEl.classList.add('pop');
@@ -503,13 +499,12 @@ function play(level) {
       <div><p class="eyebrow">${level.difficulty} · ${level.bpm} BPM</p><h2>${level.name}</h2></div>
       <div class="stat"><strong id="seq-counter">0 / ${level.sequences.length}</strong><span>SEQUENCE</span></div>
       <div class="stat"><strong id="score">0</strong><span>SCORE</span></div>
-      <div class="stat"><strong id="combo">0</strong><span>COMBO</span></div>
     </header>
     <div class="stage">
       <div class="dancer idle"><span class="dance-label">GET READY</span></div>
       <div class="sequence-panel">
         <div class="sequence"></div>
-        <div class="beat-bar"><div class="beat-fill"></div><div class="perfect-marker" title="PERFECT"></div></div>
+        <div class="beat-bar"><div class="perfect-zone"></div><div class="beat-fill"></div><div class="perfect-marker" title="PERFECT"></div></div>
       </div>
     </div>
     <p class="help">Type <kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> in order, then hit <kbd>SPACE</kbd> when the bar fills. <kbd>ESC</kbd> to pause.</p>

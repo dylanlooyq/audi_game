@@ -1,4 +1,4 @@
-export const TIMING = { perfect: 90, great: 170, cool: 260, bad: 400, miss: 500 };
+export const TIMING = { perfect: 130, great: 220, cool: 320, bad: 440, miss: 540 };
 export const SCORES = { PERFECT: 1000, GREAT: 700, COOL: 400, BAD: 100, MISS: 0 };
 
 export const PERFECT_BONUS_BASE = 50;
