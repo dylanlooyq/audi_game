@@ -1,14 +1,40 @@
-import { LEVELS, ARROWS } from './level-data.js';
-import { TIMING, SEQUENCE_GAP_MS, rankFor } from './config.js';
+import { LEVELS } from './level-data.js';
+import { TIMING, REVERSE_MAX, REVERSE_MULT_GROWTH, rankFor } from './config.js';
 import { ScoreState } from './scoring.js';
 import { ChoreographyController } from './choreography.js';
-import { sfx, primeAudio } from './sfx.js';
+import { sfx, primeAudio, isMuted, toggleMute } from './sfx.js';
 
 const app = document.querySelector('#app');
 let activeGame = null;
 const directionFromKey = { ArrowLeft: 'left', ArrowUp: 'up', ArrowRight: 'right', ArrowDown: 'down' };
+const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 const button = (text, className = 'primary') => `<button class="${className}">${text}</button>`;
 function mount(html) { if (activeGame) activeGame.destroy(); activeGame = null; cleanupMapListener(); app.innerHTML = html; }
+
+const REVERSE_KEY = 'audi-game:reverse';
+function loadReverseCount() {
+  try {
+    const n = parseInt(localStorage.getItem(REVERSE_KEY) || '0', 10);
+    if (isNaN(n)) return 0;
+    return Math.max(0, Math.min(REVERSE_MAX, n));
+  } catch { return 0; }
+}
+function saveReverseCount(n) {
+  try { localStorage.setItem(REVERSE_KEY, String(n)); } catch {}
+}
+let reverseCount = loadReverseCount();
+
+function generateReverses(len, count) {
+  const reverses = new Array(len).fill(false);
+  const positions = Array.from({ length: len }, (_, i) => i);
+  for (let i = positions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [positions[i], positions[j]] = [positions[j], positions[i]];
+  }
+  const actual = Math.min(count, len);
+  for (let i = 0; i < actual; i++) reverses[positions[i]] = true;
+  return reverses;
+}
 
 const PROGRESS_KEY = 'audi-game:progress';
 function loadProgress() {
@@ -54,9 +80,16 @@ function menu() {
     <h1>Dance<br>Game</h1>
     <p class="subhead">Type the arrow sequence, then slam <kbd>SPACE</kbd> on the beat. Perfect timing lands the biggest move.</p>
     ${button('START GAME')}
+    <button class="reset-progress" data-act="reset">Reset progress</button>
   </section>`);
-  const btn = app.querySelector('button');
-  btn.onclick = () => { primeAudio(); map(); };
+  app.querySelector('.primary').onclick = () => { primeAudio(); map(); };
+  app.querySelector('.reset-progress').onclick = resetProgress;
+}
+
+function resetProgress() {
+  if (!confirm('Reset all progress? This clears your unlocks and best scores.')) return;
+  try { localStorage.removeItem(PROGRESS_KEY); } catch {}
+  menu();
 }
 
 let mapResizeHandler = null;
@@ -129,12 +162,15 @@ class AuditionGame {
     this.level = level;
     this.score = new ScoreState();
     const beatMs = 60000 / level.bpm;
-    let cursor = level.leadIn;
+    this.effectiveLeadIn = Math.max(level.leadIn, 3200);
+    this.reverseCount = reverseCount;
+    let cursor = this.effectiveLeadIn;
     this.sequences = level.sequences.map((seq, index) => {
       const beats = Math.max(4, seq.arrows.length + 1);
       const duration = beats * beatMs;
-      const entry = { ...seq, index, startTime: cursor, commitTime: cursor + duration };
-      cursor = entry.commitTime + SEQUENCE_GAP_MS;
+      const reverses = generateReverses(seq.arrows.length, this.reverseCount);
+      const entry = { ...seq, index, startTime: cursor, commitTime: cursor + duration, reverses };
+      cursor = entry.commitTime + duration;
       return entry;
     });
     this.currentIndex = 0;
@@ -143,11 +179,13 @@ class AuditionGame {
     this.finished = false;
     this.paused = false;
     this.pausedAt = 0;
+    this.mode = 'rest';
+    this.introPhase = null;
     this.startedAt = performance.now();
     this.frame = this.frame.bind(this);
     this.onKey = this.onKey.bind(this);
     document.addEventListener('keydown', this.onKey);
-    this.renderSequence();
+    this.renderRest();
     requestAnimationFrame(this.frame);
   }
 
@@ -177,8 +215,11 @@ class AuditionGame {
     event.preventDefault();
     if (this.locked) return;
     if (this.entered.length >= seq.arrows.length) return;
-    const expected = seq.arrows[this.entered.length];
-    if (direction === expected) {
+    const i = this.entered.length;
+    const displayed = seq.arrows[i];
+    const isReverse = seq.reverses[i];
+    const required = isReverse ? OPPOSITE[displayed] : displayed;
+    if (direction === required) {
       this.entered.push(direction);
       sfx.tick();
     } else {
@@ -203,7 +244,8 @@ class AuditionGame {
       const diff = Math.abs(this.now() - seq.commitTime);
       judgment = diff <= TIMING.perfect ? 'PERFECT'
         : diff <= TIMING.great ? 'GREAT'
-        : diff <= TIMING.good ? 'GOOD'
+        : diff <= TIMING.cool ? 'COOL'
+        : diff <= TIMING.bad ? 'BAD'
         : 'MISS';
     }
     this.applyJudgment(seq, judgment);
@@ -211,20 +253,22 @@ class AuditionGame {
   }
 
   applyJudgment(seq, judgment) {
-    this.score.apply(judgment);
-    if (judgment === 'MISS') this.choreo.idle('MISS');
+    const reverses = seq.reverses.filter(Boolean).length;
+    const multiplier = Math.pow(REVERSE_MULT_GROWTH, reverses);
+    this.score.apply(judgment, multiplier);
+    if (judgment === 'MISS' || judgment === 'BAD') this.choreo.idle(judgment);
     else this.choreo.perform(seq.choreo);
-    this.showJudge(judgment);
+    this.showJudge(judgment, reverses);
     this.updateHud();
     this.playJudgeSfx(judgment);
-    if (judgment !== 'MISS') this.burst(judgment);
-    if (judgment === 'PERFECT') this.shake();
+    this.burst(judgment);
   }
 
   playJudgeSfx(judgment) {
     if (judgment === 'PERFECT') sfx.perfect();
     else if (judgment === 'GREAT') sfx.great();
-    else if (judgment === 'GOOD') sfx.good();
+    else if (judgment === 'COOL') sfx.cool();
+    else if (judgment === 'BAD') sfx.bad();
     else sfx.miss();
   }
 
@@ -237,21 +281,66 @@ class AuditionGame {
       setTimeout(() => results(this.level, this.score), 800);
       return;
     }
-    this.renderSequence();
+    this.mode = 'rest';
+    this.renderRest();
   }
 
   frame() {
     if (this.finished || this.paused) return;
     const seq = this.currentSeq();
     if (seq) {
+      this.updateIntroPhase();
       if (this.now() > seq.commitTime + TIMING.miss) {
         this.applyJudgment(seq, 'MISS');
         this.advance();
       } else {
+        if (this.mode === 'rest' && this.now() >= seq.startTime) {
+          this.mode = 'active';
+          this.renderSequence();
+        }
         this.updateBeatBar(seq);
       }
     }
     if (!this.finished && !this.paused) requestAnimationFrame(this.frame);
+  }
+
+  updateIntroPhase() {
+    const t = this.now();
+    const L = this.effectiveLeadIn;
+    let phase = null;
+    if (this.currentIndex === 0) {
+      if (t < L * 0.3) phase = 'title';
+      else if (t < L * 0.525) phase = 'count-3';
+      else if (t < L * 0.75) phase = 'count-2';
+      else if (t < L) phase = 'count-1';
+      else if (t < L + 500) phase = 'go';
+    }
+    if (phase === this.introPhase) return;
+    this.introPhase = phase;
+    this.renderIntroPhase(phase);
+  }
+
+  renderIntroPhase(phase) {
+    const stage = document.querySelector('.stage');
+    if (!stage) return;
+    let el = stage.querySelector('.intro');
+    if (phase === null) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      stage.append(el);
+    }
+    const spec = {
+      'title': { text: `${this.level.name} · ${this.level.difficulty}`, cls: 'intro title' },
+      'count-3': { text: '3', cls: 'intro count' },
+      'count-2': { text: '2', cls: 'intro count' },
+      'count-1': { text: '1', cls: 'intro count' },
+      'go': { text: 'GO!', cls: 'intro go' },
+    }[phase];
+    el.className = spec.cls;
+    el.textContent = spec.text;
+    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    if (phase.startsWith('count-')) sfx.count();
+    else if (phase === 'go') sfx.go();
   }
 
   updateBeatBar(seq) {
@@ -262,8 +351,17 @@ class AuditionGame {
     if (t < seq.startTime) { fill.style.width = '0%'; bar.classList.remove('armed'); return; }
     const progress = Math.min(1, (t - seq.startTime) / (seq.commitTime - seq.startTime));
     fill.style.width = `${progress * 100}%`;
-    const nearTarget = Math.abs(t - seq.commitTime) <= TIMING.good;
+    const nearTarget = Math.abs(t - seq.commitTime) <= TIMING.bad;
     bar.classList.toggle('armed', nearTarget || progress >= 1);
+  }
+
+  renderRest() {
+    const seq = this.currentSeq();
+    const container = document.querySelector('.sequence');
+    const counter = document.querySelector('#seq-counter');
+    if (counter) counter.textContent = `${Math.min(this.currentIndex + 1, this.sequences.length)} / ${this.sequences.length}`;
+    if (!container || !seq) return;
+    container.innerHTML = this.currentIndex === 0 ? '' : `<span class="rest-label">GET READY</span>`;
   }
 
   renderSequence() {
@@ -274,30 +372,40 @@ class AuditionGame {
     if (!container || !seq) return;
     container.innerHTML = seq.arrows.map((dir, i) => {
       const filled = this.entered[i];
-      let state = '';
-      if (filled === 'WRONG' && i === this.entered.length - 1) state = 'wrong';
-      else if (filled) state = 'done';
-      else if (i === this.entered.length && !this.locked) state = 'next';
-      return `<span class="arrow ${state}">${ARROWS[dir]}</span>`;
+      const isReverse = seq.reverses[i];
+      const classes = ['arrow'];
+      if (filled === 'WRONG' && i === this.entered.length - 1) classes.push('wrong');
+      else if (filled) classes.push('done');
+      else if (isReverse) classes.push('reverse');
+      else classes.push('default');
+      if (i === this.entered.length && !this.locked && !filled) classes.push('next');
+      return `<span class="${classes.join(' ')}" data-dir="${dir}"></span>`;
     }).join('');
   }
 
-  showJudge(judgment) {
-    const old = document.querySelector('.judge');
+  showJudge(judgment, reverses = 0) {
+    const stage = document.querySelector('.stage');
+    if (!stage) return;
+    const old = stage.querySelector('.judge');
     if (old) old.remove();
+    const iconFile = judgment.toLowerCase() + '.png';
+    const streak = judgment === 'PERFECT' && this.score.combo > 1
+      ? `<span class="streak">x${this.score.combo}</span>` : '';
+    const multiplier = reverses > 0 && judgment !== 'MISS'
+      ? `<span class="rev-mult">R${reverses} · ${Math.pow(REVERSE_MULT_GROWTH, reverses).toFixed(1)}x</span>` : '';
     const el = document.createElement('div');
     el.className = `judge ${judgment.toLowerCase()}`;
-    const streak = judgment === 'PERFECT' && this.score.perfectStreak > 1
-      ? `<span class="streak">x${this.score.perfectStreak}</span>` : '';
-    el.innerHTML = judgment + '!' + streak;
-    document.querySelector('.stage').append(el);
+    el.innerHTML = `<img src="src/assets/judgments/${iconFile}" alt="${judgment}">${streak}${multiplier}`;
+    stage.append(el);
+    setTimeout(() => { if (el.parentNode) el.remove(); }, 900);
   }
 
   burst(judgment) {
     const stage = document.querySelector('.stage');
     if (!stage) return;
-    const colors = { PERFECT: '#ffeb78', GREAT: '#76f3e7', GOOD: '#aabaff' };
-    const color = colors[judgment] || '#ffffff';
+    const colors = { PERFECT: '#ffeb78', GREAT: '#76f3e7', COOL: '#aabaff' };
+    const color = colors[judgment];
+    if (!color) return;
     const count = judgment === 'PERFECT' ? 16 : 10;
     for (let i = 0; i < count; i++) {
       const p = document.createElement('span');
@@ -310,14 +418,6 @@ class AuditionGame {
       stage.append(p);
       setTimeout(() => p.remove(), 700);
     }
-  }
-
-  shake() {
-    const stage = document.querySelector('.stage');
-    if (!stage) return;
-    stage.classList.remove('shake');
-    void stage.offsetWidth;
-    stage.classList.add('shake');
   }
 
   updateHud() {
@@ -409,7 +509,7 @@ function play(level) {
       <div class="dancer idle"><span class="dance-label">GET READY</span></div>
       <div class="sequence-panel">
         <div class="sequence"></div>
-        <div class="beat-bar"><div class="beat-fill"></div></div>
+        <div class="beat-bar"><div class="beat-fill"></div><div class="perfect-marker" title="PERFECT"></div></div>
       </div>
     </div>
     <p class="help">Type <kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> in order, then hit <kbd>SPACE</kbd> when the bar fills. <kbd>ESC</kbd> to pause.</p>
@@ -434,10 +534,10 @@ function results(level, score) {
     <div class="results-grid">
       <div><strong>${score.accuracy.toFixed(1)}%</strong><span>ACCURACY</span></div>
       <div><strong>${score.maxCombo}</strong><span>MAX COMBO</span></div>
-      <div><strong>${score.maxPerfectStreak}</strong><span>BEST STREAK</span></div>
       <div><strong>${score.counts.PERFECT}</strong><span>PERFECT</span></div>
       <div><strong>${score.counts.GREAT}</strong><span>GREAT</span></div>
-      <div><strong>${score.counts.GOOD}</strong><span>GOOD</span></div>
+      <div><strong>${score.counts.COOL}</strong><span>COOL</span></div>
+      <div><strong>${score.counts.BAD}</strong><span>BAD</span></div>
       <div><strong>${score.counts.MISS}</strong><span>MISS</span></div>
     </div>
     <div class="actions">${button('RETRY')} ${button('BACK TO MAP', 'secondary')}</div>
@@ -446,5 +546,48 @@ function results(level, score) {
   retry.onclick = () => play(level);
   back.onclick = map;
 }
+
+function updateMuteButton() {
+  const btn = document.querySelector('#mute-btn');
+  if (!btn) return;
+  btn.classList.toggle('muted', isMuted());
+}
+function setupMuteButton() {
+  const btn = document.querySelector('#mute-btn');
+  if (!btn) return;
+  updateMuteButton();
+  btn.onclick = () => { primeAudio(); toggleMute(); updateMuteButton(); };
+}
+function updateReverseBadge() {
+  const badge = document.querySelector('#reverse-badge');
+  if (!badge) return;
+  const countEl = badge.querySelector('.rev-count');
+  const multEl = badge.querySelector('.rev-mult');
+  if (countEl) countEl.textContent = reverseCount;
+  if (multEl) multEl.textContent = reverseCount > 0 ? `${Math.pow(REVERSE_MULT_GROWTH, reverseCount).toFixed(1)}x` : '—';
+  badge.classList.toggle('active', reverseCount > 0);
+}
+function bumpReverse(delta) {
+  const next = Math.max(0, Math.min(REVERSE_MAX, reverseCount + delta));
+  if (next === reverseCount) return;
+  reverseCount = next;
+  saveReverseCount(reverseCount);
+  updateReverseBadge();
+  sfx.tick();
+}
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if ((e.key === 'm' || e.key === 'M') && !e.repeat) {
+    primeAudio();
+    toggleMute();
+    updateMuteButton();
+  } else if ((e.key === '>' || e.key === '.') && !e.repeat) {
+    bumpReverse(+1);
+  } else if ((e.key === '<' || e.key === ',') && !e.repeat) {
+    bumpReverse(-1);
+  }
+});
+setupMuteButton();
+updateReverseBadge();
 
 menu();

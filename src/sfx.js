@@ -1,5 +1,18 @@
+const STORAGE_KEY = 'audi-game:audio';
 let ctx = null;
 let enabled = true;
+let muted = false;
+
+function loadPrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    muted = !!raw.muted;
+  } catch {}
+}
+function savePrefs() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ muted })); } catch {}
+}
+loadPrefs();
 
 function audio() {
   if (!ctx) {
@@ -12,9 +25,12 @@ function audio() {
 }
 
 export function primeAudio() { audio(); }
+export function isMuted() { return muted; }
+export function setMuted(v) { muted = !!v; savePrefs(); }
+export function toggleMute() { muted = !muted; savePrefs(); return muted; }
 
 function tone({ freq, type = 'sine', duration = 0.08, gain = 0.06, sweep = null, delay = 0 }) {
-  if (!enabled) return;
+  if (muted || !enabled) return;
   const c = audio();
   if (!c) return;
   const t0 = c.currentTime + delay;
@@ -42,8 +58,14 @@ export const sfx = {
     tone({ freq: 660, type: 'triangle', duration: 0.1, gain: 0.06 });
     tone({ freq: 990, type: 'triangle', duration: 0.14, gain: 0.05, delay: 0.05 });
   },
-  good() { tone({ freq: 440, type: 'triangle', duration: 0.12, gain: 0.05 }); },
+  cool() { tone({ freq: 440, type: 'triangle', duration: 0.12, gain: 0.05 }); },
+  bad() { tone({ freq: 310, type: 'triangle', duration: 0.16, gain: 0.05, sweep: 220 }); },
   miss() { tone({ freq: 240, type: 'sawtooth', duration: 0.28, gain: 0.06, sweep: 110 }); },
+  count() { tone({ freq: 660, type: 'triangle', duration: 0.14, gain: 0.07 }); },
+  go() {
+    tone({ freq: 880, type: 'triangle', duration: 0.15, gain: 0.09 });
+    tone({ freq: 1320, type: 'triangle', duration: 0.2, gain: 0.07, delay: 0.05 });
+  },
   unlock() {
     tone({ freq: 523, type: 'triangle', duration: 0.15, gain: 0.06 });
     tone({ freq: 784, type: 'triangle', duration: 0.15, gain: 0.06, delay: 0.1 });

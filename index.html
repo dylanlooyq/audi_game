@@ -9,6 +9,21 @@
   </head>
   <body>
     <main id="app" aria-live="polite"></main>
+    <div class="global-controls">
+      <div class="control-btn reverse-badge" id="reverse-badge" title="Reverse notes per sequence · &lt; decrease · &gt; increase">
+        <span class="rev-icon">REV</span>
+        <span class="rev-count">0</span>
+        <span class="rev-mult">—</span>
+      </div>
+      <button class="control-btn mute-btn" id="mute-btn" aria-label="Toggle sound" title="Toggle sound (M)">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+          <path d="M3 9v6h4l5 5V4L7 9H3z"/>
+          <path class="waves" d="M15.5 8.5c1.1.7 1.7 1.9 1.7 3s-.6 2.3-1.7 3M18 6c2.1 1.2 3.5 3.4 3.5 6s-1.4 4.8-3.5 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          <line class="cross-a" x1="16" y1="7" x2="22" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <line class="cross-b" x1="22" y1="7" x2="16" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
     <script type="module" src="src/main.js"></script>
   </body>
 </html>
