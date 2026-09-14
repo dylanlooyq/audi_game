@@ -1,0 +1,46 @@
+{
+  "name": "audi-game",
+  "version": "0.1.0",
+  "description": "Dance rhythm game",
+  "main": "electron-main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.dylanlooyq.audigame",
+    "productName": "Audi Game",
+    "files": [
+      "electron-main.cjs",
+      "index.html",
+      "styles.css",
+      "src/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "allowScripts": {
+    "electron@32.3.3": true
+  }
+}
