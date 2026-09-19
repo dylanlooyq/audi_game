@@ -8,6 +8,7 @@ import { MIXAMO_REST } from './mixamo-rest.js';
 
 const PREFIX = 'mixamorig';
 const HIPS = 'mixamorigHips';
+const MAX_TRAVEL_CM = 50;       // dances that walk or slide are eased so she stays near the middle of the platform
 const MIXAMO_HIPS_HEIGHT = 100; // hip height, in cm, of the standard Mixamo skeleton the FBX files are authored for
 
 const animationUrl = (file) => new URL(`./assets/animations/${file}`, import.meta.url).href;
@@ -59,7 +60,8 @@ export function createRetargeter(model) {
         }
         tracks.push(new THREE.QuaternionKeyframeTrack(t.name, t.times, out));
       } else if (prop === 'position' && node === HIPS) {
-        // Centre the horizontal travel so root motion can't walk her off the platform; keep the vertical bounce.
+        // Centre the horizontal travel and ease big excursions so root motion can't walk her off the platform;
+        // the vertical bounce is kept as is.
         const n = t.times.length;
         let mx = 0, mz = 0;
         for (let i = 0; i < n; i++) { mx += t.values[i * 3]; mz += t.values[i * 3 + 2]; }
@@ -67,7 +69,10 @@ export function createRetargeter(model) {
         const out = new Float32Array(t.values.length);
         const v = new THREE.Vector3();
         for (let i = 0; i < n; i++) {
-          v.set(t.values[i * 3] - mx, t.values[i * 3 + 1], t.values[i * 3 + 2] - mz).multiplyScalar(scale);
+          let x = t.values[i * 3] - mx, z = t.values[i * 3 + 2] - mz;
+          const r = Math.hypot(x, z);
+          if (r > 1e-6) { const k = MAX_TRAVEL_CM * Math.tanh(r / MAX_TRAVEL_CM) / r; x *= k; z *= k; } // ~unchanged for small sways
+          v.set(x, t.values[i * 3 + 1], z).multiplyScalar(scale);
           v.applyQuaternion(toParent).toArray(out, i * 3);
         }
         tracks.push(new THREE.VectorKeyframeTrack(t.name, t.times, out));
@@ -99,7 +104,8 @@ export function estimateClipBpm(clip) {
     const mag = Math.hypot(re, im);
     if (mag > best) { best = mag; bestF = f; }
   }
-  return bestF * 60;
+  // a peak pinned to either end of the search range means there is no clear bounce to measure
+  return bestF > 1.06 && bestF < 2.54 ? bestF * 60 : null;
 }
 
 // Loads every file in the manifest ({ clipName: { file, free? } }); calls onClip(name, clip, entry, measuredBpm) as each arrives.

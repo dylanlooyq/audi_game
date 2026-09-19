@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from './vendor/three/addons/loaders/GLTFLoader.js';
 import { toCreasedNormals } from './vendor/three/addons/utils/BufferGeometryUtils.js';
+import { Stage } from './stage3d.js';
 import { buildProceduralClips } from './procedural-clips.js';
 import { createRetargeter, loadAnimationLibrary } from './animation-library.js';
 import { moveFor, ANIMATION_FILES, STUMBLE_MOVE, IDLE_CLIP } from './dance-moves.js';
@@ -80,6 +81,8 @@ export class Dancer3D {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setClearColor(0x000000, 0);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.canvas = this.renderer.domElement;
     this.canvas.className = 'dancer-canvas';
     container.prepend(this.canvas);
@@ -91,8 +94,7 @@ export class Dancer3D {
     this.camera.position.set(0, this.camY, CAM_DIST);
     this.camera.lookAt(0, this.camY, 0);
 
-    this.buildLights();
-    this.buildStage();
+    this.stage = new Stage(this.scene, { gradientMap: makeGradientMap() });
 
     // rig: yaw + travel + hop | tilt: roll/flip/squash around the body centre | model
     this.rig = new THREE.Group();
@@ -113,42 +115,6 @@ export class Dancer3D {
       new GLTFLoader().load(MODEL_URL, (gltf) => { this.onModel(gltf); resolve(); }, undefined, reject);
     });
     this.loaded.catch((err) => console.error('Dancer3D: model failed to load', err));
-  }
-
-  buildLights() {
-    this.scene.add(new THREE.AmbientLight(0xb4b8ff, 0.9));
-    const key = new THREE.DirectionalLight(0xfff1e0, 2.6);
-    key.position.set(3, 5, 5);
-    const rim = new THREE.DirectionalLight(0x7f9bff, 2.2);
-    rim.position.set(-4, 3, -4);
-    this.flashLight = new THREE.PointLight(0xffe08a, 0, 12);
-    this.flashLight.position.set(0, 2.5, 3);
-    this.scene.add(key, rim, this.flashLight);
-  }
-
-  buildStage() {
-    const platform = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.8, 1.9, 0.14, 56),
-      new THREE.MeshToonMaterial({ color: 0x3a2f80, gradientMap: makeGradientMap() })
-    );
-    platform.position.y = -0.07;
-    this.ringMat = new THREE.MeshBasicMaterial({ color: 0x73f0e7, transparent: true });
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.72, 0.04, 8, 72), this.ringMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.005;
-
-    this.beams = [];
-    [[-1, 0xff739e], [1, 0x73f0e7]].forEach(([side, color]) => {
-      const beam = new THREE.Mesh(
-        new THREE.ConeGeometry(1.1, 6, 28, 1, true),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.09, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
-      );
-      beam.position.set(side * 2.6, 3, -1.6);
-      beam.userData.side = side;
-      this.beams.push(beam);
-      this.scene.add(beam);
-    });
-    this.scene.add(platform, ring);
   }
 
   onModel(gltf) {
@@ -188,6 +154,7 @@ export class Dancer3D {
       if (mesh.isSkinnedMesh) outline.bind(mesh.skeleton, mesh.bindMatrix);
       outline.frustumCulled = false;
       mesh.frustumCulled = false;
+      mesh.castShadow = true;
       mesh.add(outline);
     }
 
@@ -219,6 +186,7 @@ export class Dancer3D {
   addClip(name, clip, entry, measuredBpm) {
     const action = this.mixer.clipAction(clip);
     action.freeRun = !!entry.free;
+    action.groundLift = entry.lift || 0; // measured: how far this clip's feet hover above the floor (world units)
     if (!entry.free) action.clipBpm = entry.bpm || measuredBpm || CLIP_BPM;
     const old = this.actions[name];
     if (old) {
@@ -244,9 +212,9 @@ export class Dancer3D {
   }
 
   accent(judgment) {
-    if (judgment === 'PERFECT') { this.kick = 1; this.flash = 1; }
-    else if (judgment === 'GREAT') { this.kick = 0.6; this.flash = 0.6; }
-    else if (judgment === 'COOL') { this.flash = 0.3; }
+    if (judgment === 'PERFECT') { this.kick = 1; this.flash = 1; this.stage.accent(1); }
+    else if (judgment === 'GREAT') { this.kick = 0.6; this.flash = 0.6; this.stage.accent(0.6); }
+    else if (judgment === 'COOL') { this.flash = 0.3; this.stage.accent(0.3); }
   }
 
   destroy() {
@@ -258,6 +226,7 @@ export class Dancer3D {
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       mats.forEach((m) => m?.dispose?.());
     });
+    this.stage.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     this.canvas.remove();
@@ -295,7 +264,8 @@ export class Dancer3D {
       return;
     }
     let speed = (60 / this.beatSec) / (action.clipBpm || CLIP_BPM);
-    if (speed > 1.4) speed /= 2; else if (speed < 0.7) speed *= 2;
+    while (speed > 1.41) speed /= 2;   // fold by whole octaves: a clip that bounces on every 2nd beat lands the same
+    while (speed < 0.71) speed *= 2;
     if (slow) speed /= 2;
     this.loopBeats = Math.max(2, Math.round(dur / speed / this.beatSec / 2) * 2);
     action.timeScale = dur / (this.loopBeats * this.beatSec);
@@ -347,7 +317,8 @@ export class Dancer3D {
     if (fx.freeze && this.current) this.current.timeScale = t >= 1 ? 0 : this.current.timeScale;
 
     const standing = move === IDLE_MOVE;
-    let y = standing ? 0.008 * Math.sin(performance.now() * 0.002) : 0.03 * beatAbs; // breathing when waiting, groove when dancing
+    let y = standing ? 0.008 * Math.sin(performance.now() * 0.002) : 0; // just breathing while waiting; real dances bring their own bounce
+    y -= this.current?.groundLift || 0;
     let yaw = 0, pitch = 0, roll = 0, x = 0, pulse = 0;
 
     if (fx.bounce) y += fx.bounce * beatAbs;
@@ -386,10 +357,6 @@ export class Dancer3D {
     this.camera.position.z = CAM_DIST - 0.45 * this.kick;
     this.camera.position.y = this.camY;
     this.camera.lookAt(0, this.camY, 0);
-    this.flashLight.intensity = 14 * this.flash;
-    this.ringMat.opacity = 0.55 + 0.45 * Math.pow(1 - (((beat % 1) + 1) % 1), 2);
-    for (const beam of this.beams) {
-      beam.rotation.z = -beam.userData.side * (0.42 + 0.12 * Math.sin((Math.PI * beat) / 2 + beam.userData.side));
-    }
+    this.stage.update(beat, dt, this.flash);
   }
 }

@@ -1,6 +1,6 @@
-// Maps the choreo names in level-data.js to a base animation clip plus procedural body effects.
-// The placeholder robot only ships a handful of clips, so variety comes from layering effects
-// on the whole character. When a richer character/clip set is dropped in, only this table changes.
+// Maps the choreo names in level-data.js to a base animation clip plus optional procedural body effects.
+// The clips are real Mixamo dances loaded from src/assets/animations/ (see ANIMATION_FILES below); the effects only
+// add a little extra flair (a hop, a spin) on top. To change a move, edit this table.
 //
 //   clip  : animation clip name inside the model file
 //   beats : nominal loop length; not used for timing any more (the dancer sets clip speed so the clip's
@@ -19,50 +19,70 @@
 
 export const MOVES = {
   // Level 1
-  'Step Touch': { clip: 'Dance',    beats: 4, fx: { sway: 0.35, swayBeats: 4, bounce: 0.05 } },
-  'Star Pose':  { clip: 'ThumbsUp', beats: 4, fx: { hop: 0.3, pulse: 0.05 } },
-  'Side Slide': { clip: 'Dance',    beats: 4, fx: { sway: 0.7, swayBeats: 4, lean: 0.12 } },
-  'Turn':       { clip: 'Dance',    beats: 4, fx: { spin: 1, spinBeats: 2, bounce: 0.05 } },
-  'Clap Beat':  { clip: 'Wave',     beats: 2, fx: { bounce: 0.09, pulse: 0.03 } },
-  'Moonwalk':   { clip: 'Walking',  beats: 2, fx: { sway: -0.9, swayBeats: 8, lean: 0.1 } },
-  'Point Up':   { clip: 'Punch',    beats: 2, fx: { hop: 0.15, lean: 0.1 } },
-  'Finale':     { clip: 'Dance',    beats: 4, fx: { spin: 2, spinBeats: 3, hop: 0.5, pulse: 0.08 } },
+  'Step Touch': { clip: 'Rumba',   beats: 4, fx: {} },
+  'Star Pose':  { clip: 'Macarena', beats: 4, fx: {} },
+  'Side Slide': { clip: 'Swing',   beats: 4, fx: {} },
+  'Turn':       { clip: 'SoulSpin', beats: 4, fx: {} },
+  'Clap Beat':  { clip: 'Chicken', beats: 4, fx: {} },
+  'Moonwalk':   { clip: 'Snake',   beats: 4, fx: {} },
+  'Point Up':   { clip: 'Jazz',    beats: 4, fx: {} },
+  'Finale':     { clip: 'Thriller', beats: 4, fx: { pulse: 0.05 } },
 
   // Level 2
-  'Bounce':     { clip: 'Dance',    beats: 4, fx: { bounce: 0.14 } },
-  'Cross Step': { clip: 'Walking',  beats: 2, fx: { sway: 0.5, swayBeats: 4, swing: 0.4 } },
-  'Spin':       { clip: 'Dance',    beats: 4, fx: { spin: 2, spinBeats: 2, bounce: 0.06 } },
-  'Power Pose': { clip: 'Punch',    beats: 2, fx: { hop: 0.25, pulse: 0.09, freeze: true } },
-  'Kick':       { clip: 'Punch',    beats: 1, fx: { bounce: 0.1, lean: 0.18 } },
-  'Wave':       { clip: 'Wave',     beats: 4, fx: { sway: 0.25, swayBeats: 4, swing: 0.2 } },
-  'Slide':      { clip: 'Walking',  beats: 2, fx: { sway: 0.8, swayBeats: 4 } },
-  'Jump':       { clip: 'Jump',     beats: 4, fx: { hop: 0.45, pulse: 0.04 } },
-  'Snap':       { clip: 'Yes',      beats: 1, fx: { bounce: 0.06, pulse: 0.06 } },
-  'Groove':     { clip: 'Dance',    beats: 4, fx: { swing: 0.35, lean: 0.1, bounce: 0.07 } },
+  'Bounce':     { clip: 'HipHop',  beats: 4, fx: {} },
+  'Cross Step': { clip: 'Swing',   beats: 4, fx: {} },
+  'Spin':       { clip: 'SoulSpin', beats: 4, fx: {} },
+  'Power Pose': { clip: 'Gangnam', beats: 4, fx: { freeze: true } }, // holds the pose after a beat
+  'Kick':       { clip: 'Bboy',    beats: 4, fx: {} },
+  'Wave':       { clip: 'Wave',    beats: 4, fx: {} },
+  'Slide':      { clip: 'Snake',   beats: 4, fx: {} },
+  'Jump':       { clip: 'House',   beats: 4, fx: { hop: 0.1 } },
+  'Snap':       { clip: 'Silly',   beats: 4, fx: {} },
+  'Groove':     { clip: 'HipHop',  beats: 4, fx: {} },
 
   // Level 3
-  'Pop Lock':   { clip: 'Dance',    beats: 2, fx: { shiver: 0.04, pulse: 0.07 } },
-  'Roll Out':   { clip: 'Dance',    beats: 4, fx: { spin: 1, spinBeats: 1, sway: 0.6, swayBeats: 4, lean: 0.2 } },
-  'Flare':      { clip: 'Jump',     beats: 4, fx: { spin: 2, spinBeats: 2, hop: 0.35, lean: 0.25 } },
-  'Konami':     { clip: 'Dance',    beats: 2, fx: { bounce: 0.1, swing: 0.5, pulse: 0.05 } },
-  'Freeze':     { clip: 'Punch',    beats: 4, fx: { hop: 0.3, lean: 0.35, freeze: true } },
-  'Spin Out':   { clip: 'Dance',    beats: 4, fx: { spin: 3, spinBeats: 3, bounce: 0.05 } },
-  'Cypher':     { clip: 'Dance',    beats: 4, fx: { sway: 0.5, swayBeats: 2, swing: 0.45, bounce: 0.08 } },
-  'Windmill':   { clip: 'Jump',     beats: 4, fx: { spin: 4, spinBeats: 3, lean: 0.35, hop: 0.2 } },
-  'Head Spin':  { clip: 'Jump',     beats: 4, fx: { flip: 1, spin: 3, spinBeats: 3, hop: 0.4 } },
-  'Six Step':   { clip: 'Walking',  beats: 1, fx: { spin: 1, spinBeats: 4, bounce: 0.09, sway: 0.3, swayBeats: 2 } },
-  'Krump':      { clip: 'Punch',    beats: 1, fx: { shiver: 0.06, bounce: 0.12, pulse: 0.09 } },
+  'Pop Lock':   { clip: 'Robot',   beats: 4, fx: { pulse: 0.04 } },
+  'Roll Out':   { clip: 'Bboy',    beats: 4, fx: {} },
+  'Flare':      { clip: 'Gangnam', beats: 4, fx: {} },
+  'Konami':     { clip: 'Robot',   beats: 4, fx: {} },
+  'Freeze':     { clip: 'Jazz',    beats: 4, fx: { freeze: true } },
+  'Spin Out':   { clip: 'SoulSpin', beats: 4, fx: { spin: 1, spinBeats: 2 } },
+  'Cypher':     { clip: 'House',   beats: 4, fx: {} },
+  'Windmill':   { clip: 'Bboy',    beats: 4, fx: { spin: 2, spinBeats: 3 } },
+  'Head Spin':  { clip: 'Bboy',    beats: 4, fx: { spin: 2, spinBeats: 3, hop: 0.12 } },
+  'Six Step':   { clip: 'House',   beats: 4, fx: {} },
+  'Krump':      { clip: 'HipHop',  beats: 4, fx: { pulse: 0.06 } },
 };
 
 // Mixamo animation files to load from src/assets/animations/, keyed by the clip name the moves above use.
 //   file : the .fbx in that folder (download from Mixamo with "Without Skin", 30 fps; tick "In Place" for dances)
 //   free : true for idles and reactions, which play in real time; leave out for dances, which are fitted to the BPM
 //   bpm  : optional step tempo of a dance; measured from the clip when left out
+//   lift : how far the clip's feet hover above the floor, in world units (measured); subtracted so she stands on the stage
 // A clip named here replaces the character's own (or hand-authored) clip of the same name, e.g. Idle and No.
 export const ANIMATION_FILES = {
-  Idle: { file: 'Breathing Idle.fbx', free: true },
-  No: { file: 'Crying.fbx', free: true },
-  Defeated: { file: 'Defeated.fbx', free: true },
+  // waiting before the song, and the MISS reaction (held until the next hit)
+  Idle: { file: 'Breathing Idle.fbx', free: true, lift: 0.039 },
+  No: { file: 'Crying.fbx', free: true, lift: 0.039 },
+
+  // dances (fitted to each song's BPM)
+  HipHop: { file: 'Hip Hop Dancing.fbx', lift: 0.02 },
+  Silly: { file: 'Silly Dancing.fbx', lift: -0.001 },
+  SoulSpin: { file: 'Northern Soul Spin.fbx', lift: 0.021 },
+  Robot: { file: 'Robot Hip Hop Dance.fbx', lift: 0.013 },
+  Rumba: { file: 'Rumba Dancing.fbx', lift: 0.028 },
+  Swing: { file: 'Swing Dancing.fbx', lift: 0.017 },
+  Snake: { file: 'Snake Hip Hop Dance.fbx', lift: -0.008 },
+  Wave: { file: 'Wave Hip Hop Dance.fbx', lift: 0.031 },
+  Chicken: { file: 'Chicken Dance.fbx', lift: -0.008 },
+  Jazz: { file: 'Jazz Dancing.fbx', lift: 0.044 },
+  House: { file: 'House Dancing.fbx', lift: -0.013 },
+  Macarena: { file: 'Macarena Dance.fbx', lift: -0.012 },
+  Thriller: { file: 'Thriller Part 2.fbx', lift: 0.005 },
+  Gangnam: { file: 'Gangnam Style.fbx', lift: 0.027 },
+  Bboy: { file: 'Bboy Hip Hop Move.fbx', lift: 0.016 },
+  // spare, not used: Defeated.fbx (slumped, head down), Breakdance Freezes.fbx (floor work: her arms are shorter than the
+  // Mixamo bot's, so her hands hover above the floor and the flips leave the ground)
 };
 
 export const DEFAULT_MOVE = { clip: 'Dance', beats: 4, fx: { bounce: 0.06, swing: 0.2 } };
