@@ -1,8 +1,8 @@
 export const LEVELS = [
   {
-    id: 'level-1', name: 'LEVEL 1', difficulty: 'EASY', bpm: 93.8,
+    id: 'level-1', name: 'LEVEL 1', difficulty: 'EASY', bpm: 94,
     music: 'src/assets/music/prettyjohn1-hip-hop-hip-hop-beat-525029.mp3',
-    firstBeat: 10600, // ms into the track where the full beat drops (beat 16 on the 93.8 BPM grid)
+    firstBeat: 8017, // ms into the track of the beat the first arrows land on: 4 beats before the drop (10.57 s, bar 1 of the full beat)
     sequences: [
       { arrows: ['left','up','right'], choreo: 'Step Touch' },
       { arrows: ['down','right','up'], choreo: 'Star Pose' },
@@ -11,6 +11,19 @@ export const LEVELS = [
       { arrows: ['right','up','left'], choreo: 'Clap Beat' },
       { arrows: ['down','down','up','up'], choreo: 'Moonwalk' },
       { arrows: ['left','right','left','right'], choreo: 'Point Up' },
+      // Moves are scored on bar lines, 2 bars apart (3 bars for 5-arrow moves), so this list is laid out
+      // against the song: move 9 lands as the quiet breakdown starts (51.4 s), move 12 lands on the second drop
+      // (66.7 s), and Finale lands on the last full-beat bar (92.3 s), leaving the fade-out for the dancer.
+      { arrows: ['right','left','up','down'], choreo: 'Bounce' },
+      { arrows: ['left','up','down','up'], choreo: 'Groove' },
+      // Breakdown (51.4 s to 66.7 s)
+      { arrows: ['right','down','left'], choreo: 'Snap' },
+      { arrows: ['left','down','right','up'], choreo: 'Power Pose' },
+      { arrows: ['up','right','left','down'], choreo: 'Cross Step' },
+      // Second full-beat section (66.7 s to 92.3 s), building up to the finale
+      { arrows: ['right','right','up','left'], choreo: 'Kick' },
+      { arrows: ['down','up','left','right'], choreo: 'Slide' },
+      { arrows: ['up','up','right','left','down'], choreo: 'Jump' },
       { arrows: ['up','down','left','right','up'], choreo: 'Finale' }
     ]
   },

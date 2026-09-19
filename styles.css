@@ -37,13 +37,20 @@ h1,h2,p { margin-top: 0; } h1 { font-size: clamp(3rem, 10vw, 7rem); line-height:
 .arrow.next    { transform:scale(1.05); filter:drop-shadow(0 0 16px #4affdfaa) drop-shadow(0 6px 12px #0007); }
 .arrow.reverse.next { filter:drop-shadow(0 0 16px #ff9ab3aa) drop-shadow(0 6px 12px #0007); }
 .rest-label { display:inline-flex; align-items:center; padding:18px 32px; border:2px dashed #73f0e788; background:#00000055; color:#eaf8ff; font-weight:900; letter-spacing:.2em; font-size:1.1rem; animation:pulse-rest 1.1s ease-in-out infinite; }
-.beat-bar { height:16px; border-radius:10px; background:#ffffff18; border:1px solid #ffffff28; position:relative; box-shadow:inset 0 2px 6px #0006; transition:box-shadow .15s; }
-.beat-fill { height:100%; width:0%; background:linear-gradient(90deg,#73f0e7,#ffad60); border-radius:inherit; transition:width .05s linear; }
-.beat-bar.armed { box-shadow:0 0 24px #ffad60cc, inset 0 2px 6px #0006; }
-.beat-bar.armed .beat-fill { background:linear-gradient(90deg,#ffad60,#ff6598); }
-.perfect-zone { position:absolute; top:0; bottom:0; right:0; width:14%; background:linear-gradient(90deg, transparent, #c48fff55 60%, #c48fff88); pointer-events:none; z-index:0; border-radius:inherit; }
-.perfect-marker { position:absolute; top:-7px; bottom:-7px; right:-2px; width:6px; background:#c48fff; border-radius:3px; box-shadow:0 0 12px #c48fffcc, 0 0 3px #ffffff88; z-index:3; transition:box-shadow .1s, background .1s; }
-.beat-bar.perfect-armed .perfect-marker { background:#fff; box-shadow:0 0 24px #c48fff, 0 0 10px #ffffff, 0 0 6px #ffffff; animation:perfect-pulse .18s ease-in-out infinite alternate; }
+.beat-bar { height:20px; border-radius:10px; background:#ffffff18; border:1px solid #ffffff28; position:relative; box-shadow:inset 0 2px 6px #0006; transition:box-shadow .15s; }
+.beat-zones, .beat-fill { position:absolute; inset:0; border-radius:inherit; background:var(--zones, none); }
+.beat-zones { opacity:.5; transition:opacity .25s; }
+.beat-fill { clip-path:inset(0 100% 0 0); }
+.beat-bar.resting .beat-zones { opacity:0; }
+.beat-bar.resting .beat-fill { background:linear-gradient(90deg,#7c829f,#a3a8c2); opacity:.55; }
+.beat-bar.armed { box-shadow:0 0 24px #ffffff44, inset 0 2px 6px #0006; }
+.perfect-marker { position:absolute; top:-7px; bottom:-7px; left:var(--commit-pos, 100%); width:4px; translate:-50% 0; background:#fff; border-radius:3px; box-shadow:0 0 10px #c48fffcc, 0 0 3px #ffffff88; z-index:3; transition:box-shadow .1s, opacity .2s; }
+.beat-bar.resting .perfect-marker { opacity:0; }
+.beat-bar.perfect-armed .perfect-marker { box-shadow:0 0 24px #c48fff, 0 0 10px #ffffff, 0 0 6px #ffffff; animation:perfect-pulse .18s ease-in-out infinite alternate; }
+.zone-legend { display:flex; justify-content:center; gap:16px; margin-top:8px; font-size:.68rem; font-weight:800; letter-spacing:.1em; color:#b8bfdf; }
+.zone-legend span::before { content:''; display:inline-block; width:9px; height:9px; margin-right:6px; border-radius:2px; background:var(--c); }
+.sequence-panel { transition:opacity .4s; }
+.sequence-panel.outro { opacity:0; pointer-events:none; }
 @keyframes perfect-pulse { from { transform:scaleY(1); } to { transform:scaleY(1.15); } }
 .judge { position:absolute; z-index:5; top:var(--dancer-cy); left:50%; translate:-50% -50%; pointer-events:none; animation:judge-pop .85s cubic-bezier(.34,1.56,.64,1) both; }
 .judge img { display:block; width:clamp(180px, 28vw, 340px); height:auto; filter:drop-shadow(0 10px 24px #000c); }
@@ -99,3 +106,8 @@ kbd { background:#fff2; border:1px solid #fff2; padding:2px 6px; border-radius:4
 @keyframes burst{0%{opacity:1;transform:translate(-50%,-50%) rotate(0deg)}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(180deg) scale(.4)}}
 @keyframes pulse-rest{0%,100%{opacity:.65;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
 @media(max-width:560px){#app{padding:12px}.screen{min-height:calc(100vh - 24px)}.node{width:118px;height:118px}.node.one{left:10%}.node.two{right:9%}.game-head{padding:13px}.results-grid{grid-template-columns:repeat(2,1fr)}.target-row{gap:7px}}
+.dancer-canvas { position:absolute; inset:0; width:100%; height:100%; z-index:1; display:block; pointer-events:none; }
+.dancer.has-3d { top:14px; translate:-50% 0; width:auto; height:auto; padding:5px 16px; border:0; border-radius:999px; background:#00000055; box-shadow:none; filter:none; animation:none; display:block; }
+.dancer.has-3d::before { display:none; }
+.dancer.has-3d .dance-label { font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; }
+.dancer.has-3d.idle .dance-label { color:#ff9ab3; }

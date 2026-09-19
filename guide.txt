@@ -71,10 +71,14 @@ TUNING THE SONG TIMING (in the code)
 ------------------------------------
 Open src\level-data.js and find the level. Two numbers control the sync:
 
-    bpm: 93.8,          // tempo of the song
-    firstBeat: 10600,   // ms into the song where the full beat drops
+    bpm: 94,            // tempo of the song
+    firstBeat: 8017,    // ms into the song of the beat the first arrows land on
                         // (first arrows appear here; countdown lands on the
                         //  3 beats before it)
+
+The game clock follows the song's real playback position, so these numbers
+mean exactly what they say (no hidden startup delay). To move the first arrows
+by a whole number of beats, add or subtract 60000 / bpm (about 638 ms at 94).
 
 Edit, save, then refresh the browser tab (Ctrl+R, or Ctrl+Shift+R if it
 seems stuck on old code). No rebuild needed. In the desktop app, close and
@@ -87,10 +91,37 @@ reopen it.
         drifts LATE  (arrows behind the beat)   -> raise bpm slightly (0.1)
     Fix firstBeat first, then bpm, then re-check firstBeat.
 
-Timing windows (how forgiving PERFECT / GREAT / COOL / BAD are, in ms) are in
-src\config.js:
+Timing windows (how forgiving PERFECT / GREAT / COOL / BAD are, in ms either
+side of the beat) are in src\config.js:
 
     export const TIMING = { perfect: 130, great: 220, cool: 320, bad: 440, miss: 540 };
+
+The coloured sections of the beat bar are drawn from these numbers, so edit
+them, refresh, and the bar shows the new windows. Section colours are
+JUDGE_COLORS in the same file. For reference, one beat at 94 BPM is 638 ms,
+so the current BAD window (+/-440) is nearly a full beat wide. To make the
+game stricter, try { perfect: 90, great: 150, cool: 220, bad: 300, miss: 400 }.
+
+FITTING MOVES TO A SONG
+A move's scoring beat (the white line on the bar) always lands on the first
+beat of a bar, so it stays in step with the music's phrasing. A move needs
+(arrows + 1) beats, minimum 4. Moves are then spaced in whole bars (4 beats),
+with at least 3 beats of rest before the next move's arrows appear:
+    3-4 arrows -> 2 bars (8 beats, about 5.1 s at 94 BPM)
+    5 arrows   -> 3 bars (12 beats)
+The knobs are BEATS_PER_BAR and MIN_REST_BEATS in src\config.js.
+To make a move land on a musical change (a drop), count bars from the first
+move: with 8-beat spacing, move N scores at beat 4 + 8 x (N - 1).
+Level 1 is laid out this way against its song (bar = 2.55 s): first drop
+10.6 s (move 1), quiet breakdown from 51.4 s (move 9), 2nd drop 66.7 s
+(move 12), last full-beat bar 92.3 s (Finale, move 16), fade-out to 96.1 s.
+If the bar ever feels out of step with the music, first check which beat of
+the bar the move lands on before touching bpm: the bar itself fills at exactly
+the level's bpm.
+
+After the last move, the dancer keeps performing (a new move every 4 beats)
+until the song ends, then the results screen shows. Keep each level's moves
+shorter than its song.
 
 Levels without a "music" line use "leadIn" (ms before the first arrows) and
 "bpm" the same way.

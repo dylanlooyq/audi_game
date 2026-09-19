@@ -1,9 +1,9 @@
 import { LEVELS } from './level-data.js';
-import { TIMING, REVERSE_MAX, REVERSE_MULT_GROWTH, rankFor } from './config.js';
+import { TIMING, JUDGE_COLORS, BEATS_PER_BAR, MIN_REST_BEATS, REVERSE_MAX, REVERSE_MULT_GROWTH, rankFor } from './config.js';
 import { ScoreState } from './scoring.js';
 import { ChoreographyController } from './choreography.js';
 import { sfx, primeAudio, isMuted, toggleMute } from './sfx.js';
-import { playMusic, pauseMusic, resumeMusic, stopMusic, syncMusicMute } from './music.js';
+import { playMusic, pauseMusic, resumeMusic, stopMusic, syncMusicMute, musicPositionMs, musicEnded } from './music.js';
 
 const app = document.querySelector('#app');
 let activeGame = null;
@@ -158,6 +158,20 @@ function map() {
   window.addEventListener('resize', mapResizeHandler);
 }
 
+// Colours the beat bar by what a Space press would score at each moment: MISS while it is too early, then
+// BAD > COOL > GREAT > PERFECT up to the beat, and back down again after it, ending in MISS when the move expires.
+function zoneGradient(start, commit, end) {
+  const T = TIMING;
+  const bands = [
+    ['MISS', start, commit - T.bad], ['BAD', commit - T.bad, commit - T.cool], ['COOL', commit - T.cool, commit - T.great],
+    ['GREAT', commit - T.great, commit - T.perfect], ['PERFECT', commit - T.perfect, commit + T.perfect],
+    ['GREAT', commit + T.perfect, commit + T.great], ['COOL', commit + T.great, commit + T.cool],
+    ['BAD', commit + T.cool, commit + T.bad], ['MISS', commit + T.bad, end],
+  ];
+  const pos = (ms) => ((ms - start) / (end - start) * 100).toFixed(2);
+  return `linear-gradient(90deg, ${bands.map(([j, a, b]) => `${JUDGE_COLORS[j]} ${pos(a)}% ${pos(b)}%`).join(', ')})`;
+}
+
 class AuditionGame {
   constructor(level) {
     this.level = level;
@@ -166,14 +180,24 @@ class AuditionGame {
     this.beatMs = beatMs;
     this.effectiveLeadIn = level.firstBeat ?? Math.max(level.leadIn, 3200);
     this.reverseCount = reverseCount;
-    let cursor = this.effectiveLeadIn;
+    let prevCommit = null;
     this.sequences = level.sequences.map((seq, index) => {
-      const beats = Math.max(4, seq.arrows.length + 1);
+      const beats = Math.max(4, seq.arrows.length + 1); // one beat per arrow plus one, at least a bar
       const duration = beats * beatMs;
       const reverses = generateReverses(seq.arrows.length, this.reverseCount);
-      const entry = { ...seq, index, startTime: cursor, commitTime: cursor + duration, reverses };
-      cursor = entry.commitTime + duration;
-      return entry;
+      // Scoring beats sit on bar lines: whole bars after the previous one, leaving MIN_REST_BEATS of rest,
+      // so the beat line stays in step with the music's phrasing instead of drifting a beat per move.
+      const barsFor = (needed) => Math.ceil(needed / BEATS_PER_BAR) * BEATS_PER_BAR * beatMs;
+      const commitTime = prevCommit === null
+        ? this.effectiveLeadIn + barsFor(beats)
+        : prevCommit + barsFor(beats + MIN_REST_BEATS);
+      const startTime = commitTime - duration;
+      const barEnd = commitTime + TIMING.miss; // the bar runs until the move expires
+      prevCommit = commitTime;
+      return {
+        ...seq, index, startTime, commitTime, reverses, barSpan: barEnd - startTime,
+        commitPos: (duration / (barEnd - startTime)) * 100, zones: zoneGradient(startTime, commitTime, barEnd),
+      };
     });
     this.currentIndex = 0;
     this.entered = [];
@@ -184,8 +208,8 @@ class AuditionGame {
     this.mode = 'rest';
     this.introPhase = null;
     this.startedAt = performance.now();
-    // Song plays from t=0; whenever it (re)starts, lock the game clock to the audio position.
-    if (level.music) playMusic(level.music, ms => { this.startedAt = performance.now() - ms; });
+    // The song plays from t=0 and now() follows its playback position.
+    if (level.music) playMusic(level.music);
     this.frame = this.frame.bind(this);
     this.onKey = this.onKey.bind(this);
     document.addEventListener('keydown', this.onKey);
@@ -193,7 +217,10 @@ class AuditionGame {
     requestAnimationFrame(this.frame);
   }
 
-  now() { return performance.now() - this.startedAt; }
+  now() {
+    const music = musicPositionMs();
+    return music !== null ? music : performance.now() - this.startedAt;
+  }
   currentSeq() { return this.sequences[this.currentIndex]; }
 
   onKey(event) {
@@ -260,8 +287,8 @@ class AuditionGame {
     const reverses = seq.reverses.filter(Boolean).length;
     const multiplier = Math.pow(REVERSE_MULT_GROWTH, reverses);
     this.score.apply(judgment, multiplier);
-    if (judgment === 'MISS' || judgment === 'BAD') this.choreo.idle(judgment);
-    else this.choreo.perform(seq.choreo);
+    if (judgment === 'MISS') this.choreo.idle(judgment); // stumble until the next hit (BAD or better)
+    else this.choreo.perform(seq.choreo, judgment);
     this.showJudge(judgment, reverses);
     this.updateHud();
     this.playJudgeSfx(judgment);
@@ -281,18 +308,47 @@ class AuditionGame {
     this.entered = [];
     this.locked = false;
     if (this.currentIndex >= this.sequences.length) {
-      this.finished = true;
-      setTimeout(() => results(this.level, this.score), 800);
+      this.startOutro();
       return;
     }
     this.mode = 'rest';
     this.renderRest();
   }
 
+  // After the last move there is nothing left to hit, so the dancer keeps performing until the song ends.
+  startOutro() {
+    this.mode = 'outro';
+    this.outroIndex = 0;
+    this.outroNextMove = this.sequences[this.sequences.length - 1].commitTime + 4 * this.beatMs;
+    this.outroFallbackEnd = this.now() + 800; // used when there is no song to wait for
+    const container = document.querySelector('.sequence');
+    if (container) container.innerHTML = '';
+    document.querySelector('.sequence-panel')?.classList.add('outro');
+  }
+
+  updateOutro() {
+    const t = this.now();
+    if (t >= this.outroNextMove) {
+      const moves = this.level.sequences;
+      this.choreo.perform(moves[this.outroIndex % moves.length].choreo, 'GREAT');
+      this.outroIndex++;
+      this.outroNextMove += 4 * this.beatMs; // a new move every 4 beats, on the beat grid
+    }
+    if (musicPositionMs() === null && t >= this.outroFallbackEnd) this.finish();
+  }
+
+  finish() {
+    if (this.finished) return;
+    this.finished = true;
+    results(this.level, this.score);
+  }
+
   frame() {
     if (this.finished || this.paused) return;
+    if (musicEnded()) { this.finish(); return; }
     const seq = this.currentSeq();
-    if (seq) {
+    if (this.mode === 'outro') this.updateOutro();
+    else if (seq) {
       this.updateIntroPhase();
       if (this.now() > seq.commitTime + TIMING.miss) {
         this.applyJudgment(seq, 'MISS');
@@ -353,12 +409,26 @@ class AuditionGame {
     const fill = document.querySelector('.beat-fill');
     const bar = document.querySelector('.beat-bar');
     if (!fill || !bar) return;
+    if (this.zonesFor !== seq.index) {
+      bar.style.setProperty('--zones', seq.zones);
+      bar.style.setProperty('--commit-pos', `${seq.commitPos}%`);
+      this.zonesFor = seq.index;
+    }
     const t = this.now();
-    if (t < seq.startTime) { fill.style.width = '0%'; bar.classList.remove('armed', 'perfect-armed'); return; }
-    const progress = Math.min(1, (t - seq.startTime) / (seq.commitTime - seq.startTime));
-    fill.style.width = `${progress * 100}%`;
+    const reveal = (progress) => { fill.style.clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`; };
+    if (t < seq.startTime) {
+      // Resting: fill a muted bar from the previous move's beat to this move's start, so the
+      // player can tell when the arrows are about to come back.
+      const prev = this.sequences[seq.index - 1];
+      reveal(prev ? Math.min(1, Math.max(0, (t - prev.commitTime) / (seq.startTime - prev.commitTime))) : 0);
+      bar.classList.add('resting');
+      bar.classList.remove('armed', 'perfect-armed');
+      return;
+    }
+    bar.classList.remove('resting');
+    reveal(Math.min(1, (t - seq.startTime) / seq.barSpan));
     const diff = Math.abs(t - seq.commitTime);
-    bar.classList.toggle('armed', diff <= TIMING.bad || progress >= 1);
+    bar.classList.toggle('armed', diff <= TIMING.bad);
     bar.classList.toggle('perfect-armed', diff <= TIMING.perfect);
   }
 
@@ -499,6 +569,7 @@ class AuditionGame {
     this.paused = false;
     stopMusic();
     document.removeEventListener('keydown', this.onKey);
+    this.choreo?.destroy();
   }
 }
 
@@ -513,13 +584,18 @@ function play(level) {
       <div class="dancer idle"><span class="dance-label">GET READY</span></div>
       <div class="sequence-panel">
         <div class="sequence"></div>
-        <div class="beat-bar"><div class="perfect-zone"></div><div class="beat-fill"></div><div class="perfect-marker" title="PERFECT"></div></div>
+        <div class="beat-bar"><div class="beat-zones"></div><div class="beat-fill"></div><div class="perfect-marker" title="On the beat"></div></div>
+        <div class="zone-legend">${['PERFECT', 'GREAT', 'COOL', 'BAD'].map(j => `<span style="--c:${JUDGE_COLORS[j]}">${j}</span>`).join('')}</div>
       </div>
     </div>
-    <p class="help">Type <kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> in order, then hit <kbd>SPACE</kbd> when the bar fills. <kbd>ESC</kbd> to pause.</p>
+    <p class="help">Type <kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> in order, then hit <kbd>SPACE</kbd> as the bar reaches the line — the colour under it is your rating. <kbd>ESC</kbd> to pause.</p>
   </section>`);
   const game = new AuditionGame(level);
-  game.choreo = new ChoreographyController(document.querySelector('.dancer'));
+  game.choreo = new ChoreographyController(document.querySelector('.dancer'), {
+    bpm: level.bpm,
+    clock: () => game.now() - game.effectiveLeadIn, // beat 0 = first sequence start
+    isPaused: () => game.paused,
+  });
   activeGame = game;
 }
 

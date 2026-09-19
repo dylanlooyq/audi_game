@@ -6,7 +6,8 @@ A dependency-free Audition-style rhythm/dance game prototype. Serve the folder o
 
 1. Each sequence shows a row of arrows to enter in order (`←` `↑` `↓` `→`).
 2. Type them left-to-right. Wrong key locks the sequence as a miss.
-3. When the beat bar fills up, press `SPACE` to commit. Timing vs the bar's end sets your judgment (Perfect ±100ms, Great ±200ms, Good ±350ms, Miss beyond 450ms).
+3. Press `SPACE` as the bar reaches the white beat line. The colour of the bar section under the playhead is the rating you'll get (Perfect / Great / Cool / Bad, or Miss when too early or late). The windows are set in `src/config.js`.
+4. After the last move the dancer keeps performing until the song ends, then the results screen appears.
 
 ## Project layout
 
@@ -14,7 +15,12 @@ A dependency-free Audition-style rhythm/dance game prototype. Serve the folder o
 - `src/config.js` — timing windows, scores, rank thresholds
 - `src/music.js` — music playback
 - `src/scoring.js` — score/combo/accuracy state
-- `src/choreography.js` — dance-move controller, decoupled from input
+- `src/choreography.js` — dance-move controller, decoupled from input (falls back to a CSS placeholder if WebGL is unavailable)
+- `src/dancer3d.js` — Three.js cel-shaded 3D dancer: toon materials, inverted-hull outlines, stage, beat-synced animation
+- `src/dance-moves.js` — maps each choreo name in level data to a base clip plus procedural effects (spin, hop, sway…)
+- `src/procedural-clips.js` — hand-posed skeleton animations (waiting stretch, MISS stumble) for Mixamo-rigged characters that only have a dance clip
+- `src/vendor/three/` — vendored Three.js (r170) + GLTFLoader, loaded through the import map in `index.html`
+- `src/assets/models/` — the dancer's `.glb` (placeholder robot, CC0). See the README there to swap the character
 - `src/main.js` — screen flow and Audition-style runtime
 - `electron-main.cjs` — Electron entry (packaging only)
 
