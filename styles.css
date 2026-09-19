@@ -24,8 +24,9 @@ h1,h2,p { margin-top: 0; } h1 { font-size: clamp(3rem, 10vw, 7rem); line-height:
 .game { gap: 18px; }.game-head { background:#ffffff0c; border:1px solid #ffffff14; padding:18px 22px; border-radius:18px; }.stat { text-align:right; }.stat strong { display:block; font-size:1.65rem; color:#ffdd78; }.stat span { font-size:.72rem; font-weight:800; letter-spacing:.1em; color:#b8bfdf; }
 .stage { position:relative; flex:1; min-height:470px; overflow:hidden; border-radius:28px; border:1px solid #ffffff1a; background:linear-gradient(180deg,#2a2161 0%,#111735 68%,#0d1024 68%); --dancer-cy: 40%; }
 .sequence-panel { position:absolute; left:50%; bottom:44px; translate:-50% 0; width:min(92%, 720px); z-index:3; }
+:root { --arrow-size:clamp(56px,8vw,84px); --rest-size:clamp(64px,9vw,100px); }
 .sequence { display:flex; justify-content:center; flex-wrap:wrap; gap:clamp(8px,2vw,18px); margin-bottom:16px; min-height:80px; }
-.arrow { width:clamp(56px,8vw,84px);aspect-ratio:1; background-image:url('src/assets/notes/note-blue-default.png'); background-size:200% 200%; background-repeat:no-repeat; filter:drop-shadow(0 6px 12px #0007); transition:transform .12s, filter .15s; }
+.arrow { width:var(--arrow-size);aspect-ratio:1; background-image:url('src/assets/notes/note-blue-default.png'); background-size:200% 200%; background-repeat:no-repeat; filter:drop-shadow(0 6px 12px #0007); transition:transform .12s, filter .15s; }
 .arrow[data-dir="left"]  { background-position:   0%   0%; }
 .arrow[data-dir="up"]    { background-position: 100%   0%; }
 .arrow[data-dir="down"]  { background-position:   0% 100%; }
@@ -33,7 +34,7 @@ h1,h2,p { margin-top: 0; } h1 { font-size: clamp(3rem, 10vw, 7rem); line-height:
 .arrow.reverse { background-image:url('src/assets/notes/note-red-reverse.png'); }
 .arrow.done    { background-image:url('src/assets/notes/note-green-correct.png'); transform:scale(1.05); }
 .arrow.wrong   { background-image:url('src/assets/notes/note-grey-wrong.png'); animation:shake .25s ease; }
-.arrow.next    { transform:translateY(-4px) scale(1.05); filter:drop-shadow(0 0 16px #4affdfaa) drop-shadow(0 6px 12px #0007); }
+.arrow.next    { transform:scale(1.05); filter:drop-shadow(0 0 16px #4affdfaa) drop-shadow(0 6px 12px #0007); }
 .arrow.reverse.next { filter:drop-shadow(0 0 16px #ff9ab3aa) drop-shadow(0 6px 12px #0007); }
 .rest-label { display:inline-flex; align-items:center; padding:18px 32px; border:2px dashed #73f0e788; background:#00000055; color:#eaf8ff; font-weight:900; letter-spacing:.2em; font-size:1.1rem; animation:pulse-rest 1.1s ease-in-out infinite; }
 .beat-bar { height:16px; border-radius:10px; background:#ffffff18; border:1px solid #ffffff28; position:relative; box-shadow:inset 0 2px 6px #0006; transition:box-shadow .15s; }
@@ -70,6 +71,11 @@ kbd { background:#fff2; border:1px solid #fff2; padding:2px 6px; border-radius:4
 .reset-progress { background:none; border:none; color:#8f96bd; text-decoration:underline; font-size:.8rem; letter-spacing:.05em; margin-top:18px; cursor:pointer; padding:6px 12px; font-weight:600; }
 .reset-progress:hover { color:#fff; }
 .intro { position:absolute; z-index:6; top:var(--dancer-cy); left:50%; translate:-50% -50%; font-weight:1000; font-style:italic; letter-spacing:-.04em; text-shadow:0 6px 0 #0006; pointer-events:none; text-align:center; }
+.intro.ready { width:min(80%, 480px); animation: intro-ready .6s ease both, ready-bob 1.2s ease-in-out .6s infinite; }
+.intro.ready img { display:block; width:100%; height:auto; }
+.rest-img { height:var(--rest-size); width:auto; max-width:100%; margin-bottom:calc((var(--arrow-size) - var(--rest-size)) / 2 + var(--rest-size) * 0.02); mix-blend-mode:screen; animation:pulse-rest 1.1s ease-in-out infinite; }
+@keyframes intro-ready { 0%{opacity:0;transform:scale(.8)} 100%{opacity:1;transform:scale(1)} }
+@keyframes ready-bob { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
 .intro.title { font-size:clamp(2rem, 5.5vw, 3.75rem); color:#fff; letter-spacing:.02em; font-style:normal; animation: intro-title .95s ease both; }
 .intro.count { font-size:clamp(6rem, 15vw, 11rem); color:#ffdc78; animation: intro-count .75s ease both; }
 .intro.go { font-size:clamp(5rem, 13vw, 10rem); color:#73f0e7; animation: intro-go .5s ease both; }

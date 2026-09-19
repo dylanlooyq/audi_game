@@ -1,6 +1,8 @@
 export const LEVELS = [
   {
-    id: 'level-1', name: 'LEVEL 1', difficulty: 'EASY', bpm: 105, leadIn: 2000,
+    id: 'level-1', name: 'LEVEL 1', difficulty: 'EASY', bpm: 93.8,
+    music: 'src/assets/music/prettyjohn1-hip-hop-hip-hop-beat-525029.mp3',
+    firstBeat: 10600, // ms into the track where the full beat drops (beat 16 on the 93.8 BPM grid)
     sequences: [
       { arrows: ['left','up','right'], choreo: 'Step Touch' },
       { arrows: ['down','right','up'], choreo: 'Star Pose' },

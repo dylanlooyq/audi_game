@@ -3,6 +3,7 @@ import { TIMING, REVERSE_MAX, REVERSE_MULT_GROWTH, rankFor } from './config.js';
 import { ScoreState } from './scoring.js';
 import { ChoreographyController } from './choreography.js';
 import { sfx, primeAudio, isMuted, toggleMute } from './sfx.js';
+import { playMusic, pauseMusic, resumeMusic, stopMusic, syncMusicMute } from './music.js';
 
 const app = document.querySelector('#app');
 let activeGame = null;
@@ -162,7 +163,8 @@ class AuditionGame {
     this.level = level;
     this.score = new ScoreState();
     const beatMs = 60000 / level.bpm;
-    this.effectiveLeadIn = Math.max(level.leadIn, 3200);
+    this.beatMs = beatMs;
+    this.effectiveLeadIn = level.firstBeat ?? Math.max(level.leadIn, 3200);
     this.reverseCount = reverseCount;
     let cursor = this.effectiveLeadIn;
     this.sequences = level.sequences.map((seq, index) => {
@@ -182,6 +184,8 @@ class AuditionGame {
     this.mode = 'rest';
     this.introPhase = null;
     this.startedAt = performance.now();
+    // Song plays from t=0; whenever it (re)starts, lock the game clock to the audio position.
+    if (level.music) playMusic(level.music, ms => { this.startedAt = performance.now() - ms; });
     this.frame = this.frame.bind(this);
     this.onKey = this.onKey.bind(this);
     document.addEventListener('keydown', this.onKey);
@@ -307,11 +311,13 @@ class AuditionGame {
   updateIntroPhase() {
     const t = this.now();
     const L = this.effectiveLeadIn;
+    const b = this.beatMs;
     let phase = null;
+    // Countdown ticks land on the three beats before the first sequence; GO is on the first beat.
     if (this.currentIndex === 0) {
-      if (t < L * 0.3) phase = 'title';
-      else if (t < L * 0.525) phase = 'count-3';
-      else if (t < L * 0.75) phase = 'count-2';
+      if (t < L - 3 * b) phase = 'ready';
+      else if (t < L - 2 * b) phase = 'count-3';
+      else if (t < L - b) phase = 'count-2';
       else if (t < L) phase = 'count-1';
       else if (t < L + 500) phase = 'go';
     }
@@ -330,14 +336,14 @@ class AuditionGame {
       stage.append(el);
     }
     const spec = {
-      'title': { text: `${this.level.name} · ${this.level.difficulty}`, cls: 'intro title' },
-      'count-3': { text: '3', cls: 'intro count' },
-      'count-2': { text: '2', cls: 'intro count' },
-      'count-1': { text: '1', cls: 'intro count' },
-      'go': { text: 'GO!', cls: 'intro go' },
+      'ready': { html: '<img src="src/assets/get_ready_intro.png" alt="Get Ready">', cls: 'intro ready' },
+      'count-3': { html: '3', cls: 'intro count' },
+      'count-2': { html: '2', cls: 'intro count' },
+      'count-1': { html: '1', cls: 'intro count' },
+      'go': { html: 'GO!', cls: 'intro go' },
     }[phase];
     el.className = spec.cls;
-    el.textContent = spec.text;
+    el.innerHTML = spec.html;
     el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
     if (phase.startsWith('count-')) sfx.count();
     else if (phase === 'go') sfx.go();
@@ -362,7 +368,7 @@ class AuditionGame {
     const counter = document.querySelector('#seq-counter');
     if (counter) counter.textContent = `${Math.min(this.currentIndex + 1, this.sequences.length)} / ${this.sequences.length}`;
     if (!container || !seq) return;
-    container.innerHTML = this.currentIndex === 0 ? '' : `<span class="rest-label">GET READY</span>`;
+    container.innerHTML = this.currentIndex === 0 ? '' : `<img class="rest-img" src="src/assets/get_ready_mid.png" alt="Get Ready">`;
   }
 
   renderSequence() {
@@ -439,6 +445,7 @@ class AuditionGame {
     if (this.paused || this.finished) return;
     this.paused = true;
     this.pausedAt = performance.now();
+    pauseMusic();
     this.renderPauseOverlay();
   }
 
@@ -448,6 +455,7 @@ class AuditionGame {
     if (overlay) overlay.remove();
     this.startedAt += performance.now() - this.pausedAt;
     this.paused = false;
+    resumeMusic();
     requestAnimationFrame(this.frame);
   }
 
@@ -489,6 +497,7 @@ class AuditionGame {
   destroy() {
     this.finished = true;
     this.paused = false;
+    stopMusic();
     document.removeEventListener('keydown', this.onKey);
   }
 }
@@ -546,6 +555,7 @@ function updateMuteButton() {
   const btn = document.querySelector('#mute-btn');
   if (!btn) return;
   btn.classList.toggle('muted', isMuted());
+  syncMusicMute();
 }
 function setupMuteButton() {
   const btn = document.querySelector('#mute-btn');

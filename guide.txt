@@ -1,0 +1,102 @@
+HOW TO RUN THE GAME
+===================
+
+Open a terminal in the project folder (C:\Users\dylan\audi_game).
+
+
+OPTION 1: IN YOUR BROWSER
+-------------------------
+The game needs a small local web server. Opening index.html directly
+(file://) will NOT work, because browsers block ES modules that way.
+
+  a) Python:
+
+       python -m http.server 8000
+
+     Then open http://localhost:8000 in your browser.
+
+     Note: if "python" opens the Microsoft Store or says it isn't found,
+     the WindowsApps python.exe is only a Store stub. Use (b) instead.
+
+  b) Node (works even if "npm" isn't on your PATH):
+
+       & "C:\Program Files\nodejs\npx.cmd" serve .
+
+     It prints a URL, usually http://localhost:3000. Open that.
+
+Leave the terminal open while you play. Press Ctrl+C to stop the server.
+
+
+OPTION 2: AS A DESKTOP APP (ELECTRON)
+-------------------------------------
+Without npm on your PATH:
+
+       .\node_modules\.bin\electron.cmd .
+
+With npm working:
+
+       npm start
+
+(npm install is only needed the first time, or if node_modules is missing.
+node_modules is already installed on this machine.)
+
+
+IF "npm" IS NOT RECOGNIZED
+--------------------------
+Node is installed at C:\Program Files\nodejs but the terminal can't find it.
+Fix: close VS Code completely and reopen it so it picks up the updated PATH.
+If that doesn't work, add Node to your PATH, then open a new terminal:
+
+       [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\nodejs", "User")
+
+
+TIPS
+----
+- Click START GAME first. Browsers only allow audio after you click
+  something on the page, so music won't play before that.
+- Watch for typos in commands (e.g. "python", not "pytnon").
+- Keys: arrows to enter the sequence, SPACE to commit on the beat,
+  ESC to pause, M to mute.
+
+
+MUSIC
+-----
+- Put tracks in src\assets\music\ (.mp3 or .ogg).
+- Link a track to a level with the "music" field in src\level-data.js.
+  Level 1 is linked; levels 2 and 3 are silent for now.
+- The song plays from the moment the level loads; the first arrows appear
+  at "firstBeat" so they line up with the first full beat.
+
+TUNING THE SONG TIMING (in the code)
+------------------------------------
+Open src\level-data.js and find the level. Two numbers control the sync:
+
+    bpm: 93.8,          // tempo of the song
+    firstBeat: 10600,   // ms into the song where the full beat drops
+                        // (first arrows appear here; countdown lands on the
+                        //  3 beats before it)
+
+Edit, save, then refresh the browser tab (Ctrl+R, or Ctrl+Shift+R if it
+seems stuck on old code). No rebuild needed. In the desktop app, close and
+reopen it.
+
+  - Arrows feel EARLY vs the music  -> increase firstBeat (try +20 to +50)
+  - Arrows feel LATE vs the music   -> decrease firstBeat (try -20 to -50)
+  - Sync is good at the start but drifts over the level:
+        drifts EARLY (arrows ahead of the beat) -> lower bpm slightly (0.1)
+        drifts LATE  (arrows behind the beat)   -> raise bpm slightly (0.1)
+    Fix firstBeat first, then bpm, then re-check firstBeat.
+
+Timing windows (how forgiving PERFECT / GREAT / COOL / BAD are, in ms) are in
+src\config.js:
+
+    export const TIMING = { perfect: 130, great: 220, cool: 320, bad: 440, miss: 540 };
+
+Levels without a "music" line use "leadIn" (ms before the first arrows) and
+"bpm" the same way.
+
+BUILDING A WINDOWS INSTALLER
+----------------------------
+       npm run build
+
+Output goes to the dist folder.
