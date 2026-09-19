@@ -2,7 +2,7 @@ export const LEVELS = [
   {
     id: 'level-1', name: 'LEVEL 1', difficulty: 'EASY', bpm: 94,
     music: 'src/assets/music/prettyjohn1-hip-hop-hip-hop-beat-525029.mp3',
-    firstBeat: 8017, // ms into the track of the beat the first arrows land on: 4 beats before the drop (10.57 s, bar 1 of the full beat)
+    firstBeat: 8300, // ms into the track of the beat the first arrows land on: 4 beats before the drop (10.57 s, bar 1 of the full beat)
     sequences: [
       { arrows: ['left','up','right'], choreo: 'Step Touch' },
       { arrows: ['down','right','up'], choreo: 'Star Pose' },

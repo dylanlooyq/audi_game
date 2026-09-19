@@ -54,11 +54,22 @@ export const MOVES = {
   'Krump':      { clip: 'Punch',    beats: 1, fx: { shiver: 0.06, bounce: 0.12, pulse: 0.09 } },
 };
 
+// Mixamo animation files to load from src/assets/animations/, keyed by the clip name the moves above use.
+//   file : the .fbx in that folder (download from Mixamo with "Without Skin", 30 fps; tick "In Place" for dances)
+//   free : true for idles and reactions, which play in real time; leave out for dances, which are fitted to the BPM
+//   bpm  : optional step tempo of a dance; measured from the clip when left out
+// A clip named here replaces the character's own (or hand-authored) clip of the same name, e.g. Idle and No.
+export const ANIMATION_FILES = {
+  Idle: { file: 'Breathing Idle.fbx', free: true },
+  No: { file: 'Crying.fbx', free: true },
+  Defeated: { file: 'Defeated.fbx', free: true },
+};
+
 export const DEFAULT_MOVE = { clip: 'Dance', beats: 4, fx: { bounce: 0.06, swing: 0.2 } };
 
 // Played on a MISS and held until the player lands a BAD or better. Uses the character's 'No' clip if it has one;
-// otherwise a hand-authored staggering stumble (see procedural-clips.js).
-export const STUMBLE_MOVE = { clip: 'No', beats: 2, stumble: true, fx: { sway: 0.1, swayBeats: 2 } };
+// otherwise a hand-authored face-in-hands slump (see procedural-clips.js).
+export const STUMBLE_MOVE = { clip: 'No', beats: 2, stumble: true, fx: {} };
 export const IDLE_CLIP = 'Idle';
 
 export function moveFor(name) {

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from './vendor/three/addons/loaders/GLTFLoader.js';
 import { toCreasedNormals } from './vendor/three/addons/utils/BufferGeometryUtils.js';
 import { buildProceduralClips } from './procedural-clips.js';
-import { moveFor, STUMBLE_MOVE, IDLE_CLIP } from './dance-moves.js';
+import { createRetargeter, loadAnimationLibrary } from './animation-library.js';
+import { moveFor, ANIMATION_FILES, STUMBLE_MOVE, IDLE_CLIP } from './dance-moves.js';
 
 // Swap this (and the clip names in dance-moves.js) to change character.
 // (RobotExpressive.glb is also in that folder if you want the robot back.)
@@ -195,10 +196,14 @@ export class Dancer3D {
     for (const clip of gltf.animations) this.actions[clip.name] = this.mixer.clipAction(clip);
     // Characters with a single dance clip reuse it for every move; the T-pose reference clip is never played.
     this.fallback = this.actions[IDLE_CLIP] || Object.values(this.actions).find((a) => !/t-?pose/i.test(a.getClip().name));
-    // Characters without an idle or a stumble clip get hand-authored ones (a stretch routine, a staggering stumble).
+    // Real Mixamo animation files (src/assets/animations/) are loaded in the background and replace the stand-ins below.
+    const retarget = createRetargeter(model);
+    if (retarget) loadAnimationLibrary(retarget, ANIMATION_FILES, (name, clip, entry, bpm) => this.addClip(name, clip, entry, bpm));
+
+    // Characters without an idle or a stumble clip get hand-authored ones (a relaxed waiting stance, a face-in-hands slump).
     // They run in real time rather than being fitted to the song's tempo.
     const extra = buildProceduralClips(model);
-    for (const [name, clip] of [[IDLE_CLIP, extra.stretch], [STUMBLE_MOVE.clip, extra.stumble]]) {
+    for (const [name, clip] of [[IDLE_CLIP, extra.idle], [STUMBLE_MOVE.clip, extra.stumble]]) {
       if (!clip || this.actions[name]) continue;
       this.actions[name] = this.mixer.clipAction(clip);
       this.actions[name].freeRun = true;
@@ -207,6 +212,22 @@ export class Dancer3D {
     this.ready = true;
     this.play(IDLE_CLIP, true);
     if (this.pending) { this.startMove(this.pending); this.pending = null; }
+  }
+
+  // Registers a clip loaded from an animation file. `free` clips (idle, reactions) run in real time; the rest are
+  // dances, fitted to the song's tempo using the clip's own step tempo (`bpm` in the manifest, or measured).
+  addClip(name, clip, entry, measuredBpm) {
+    const action = this.mixer.clipAction(clip);
+    action.freeRun = !!entry.free;
+    if (!entry.free) action.clipBpm = entry.bpm || measuredBpm || CLIP_BPM;
+    const old = this.actions[name];
+    if (old) {
+      old.stop();
+      this.mixer.uncacheAction(old.getClip());
+      if (this.current === old) this.current = null;
+    }
+    this.actions[name] = action;
+    if (this.state.move.clip === name) this.startMove(this.state.move); // it is on screen right now: switch to the real one
   }
 
   // ---- public API ----------------------------------------------------------
@@ -273,7 +294,7 @@ export class Dancer3D {
       this.current = action;
       return;
     }
-    let speed = (60 / this.beatSec) / CLIP_BPM;
+    let speed = (60 / this.beatSec) / (action.clipBpm || CLIP_BPM);
     if (speed > 1.4) speed /= 2; else if (speed < 0.7) speed *= 2;
     if (slow) speed /= 2;
     this.loopBeats = Math.max(2, Math.round(dur / speed / this.beatSec / 2) * 2);

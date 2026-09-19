@@ -18,7 +18,8 @@ A dependency-free Audition-style rhythm/dance game prototype. Serve the folder o
 - `src/choreography.js` — dance-move controller, decoupled from input (falls back to a CSS placeholder if WebGL is unavailable)
 - `src/dancer3d.js` — Three.js cel-shaded 3D dancer: toon materials, inverted-hull outlines, stage, beat-synced animation
 - `src/dance-moves.js` — maps each choreo name in level data to a base clip plus procedural effects (spin, hop, sway…)
-- `src/procedural-clips.js` — hand-posed skeleton animations (waiting stretch, MISS stumble) for Mixamo-rigged characters that only have a dance clip
+- `src/procedural-clips.js` — stand-in hand-posed animations (waiting idle, MISS slump), used only until real Mixamo files are provided
+- `src/animation-library.js` — loads Mixamo `.fbx` animation files from `src/assets/animations/` and retargets them onto the character (`src/mixamo-rest.js` holds the standard Mixamo bone orientations it needs)
 - `src/vendor/three/` — vendored Three.js (r170) + GLTFLoader, loaded through the import map in `index.html`
 - `src/assets/models/` — the dancer's `.glb` (placeholder robot, CC0). See the README there to swap the character
 - `src/main.js` — screen flow and Audition-style runtime
